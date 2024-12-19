@@ -84,7 +84,11 @@ def corrScoreVec(sortVec, toOrderVec, targetCorr, tolCorr, maxIter):
     corr = np.corrcoeef(masterVec, usingVec)[0,1]
     iter = 0
     while abs(corr - targetCorr) >= tolCorr and iter <= maxIter :
-        if 
+        if corr < targetCorr:
+            
+        else:
+
+        
 
 
         corr = np.corrcoeef(masterVec, usingVec)[0,1]

@@ -50,7 +50,7 @@ def SampleScores(df, scoreCol, percCol, nScores):
             probabilities[i] = (percentiles[i - 1] - percentiles[i])/100
     
     assert np.isclose(np.sum(probabilities), 1)
-    sampleScores = np.random.choice(scores, size=nScores, p=probabilities)
+    sampleScores = nnp.random.choice(scores, size=nScores, p=probabilities)
     return sampleScores
 
 nScores = 100000
@@ -62,6 +62,30 @@ qrSample = SampleScores(vrQrScoresDf,
                         "Scaled Score", "Quantitative Reasoning", nScores=nScores)
 
 sections = [awSample, vrSample, qrSample]
+
+# Quick check that we've gotten the standard deviation and means right
+# We ought to have. The percentiles determine the distribution!
+
 for s in sections:
     print(np.mean(s))
     print(np.std(s))
+
+# Function that takes as an input two vectors and a target correlation
+
+def corrScoreVec(sortVec, toOrderVec, targetCorr, tolCorr, maxIter):
+    """
+    Function to return a new version of usingVec that is shuffled so that its
+    correlation with sortedVec is approximately equal to targetCorrr
+    """
+
+    masterVec = np.sort(sortVec.copy())
+    usingVec = np.shuffle(toOrderVec.copy())
+
+    corr = np.corrcoeef(masterVec, usingVec)[0,1]
+    iter = 0
+    while abs(corr - targetCorr) >= tolCorr and iter <= maxIter :
+        if 
+
+
+        corr = np.corrcoeef(masterVec, usingVec)[0,1]
+        iter += 1

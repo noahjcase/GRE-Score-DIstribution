@@ -4,7 +4,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import os
+import math
 
 # Read the csv files to pd data frams
 awScoresDf = pd.read_csv("aw-scores.csv")
@@ -50,10 +50,10 @@ def SampleScores(df, scoreCol, percCol, nScores):
             probabilities[i] = (percentiles[i - 1] - percentiles[i])/100
     
     assert np.isclose(np.sum(probabilities), 1)
-    sampleScores = nnp.random.choice(scores, size=nScores, p=probabilities)
+    sampleScores = np.random.choice(scores, size=nScores, p=probabilities)
     return sampleScores
 
-nScores = 100000
+nScores = 100
 awSample = SampleScores(awScoresDf,
                         "Score Levels", "Analytical Writing", nScores=nScores)
 vrSample = SampleScores(vrQrScoresDf,
@@ -63,7 +63,7 @@ qrSample = SampleScores(vrQrScoresDf,
 
 sections = [awSample, vrSample, qrSample]
 
-# Quick check that we've gotten the standard deviation and means right
+# Quick check that we've gotten the standard deviation and means right.
 # We ought to have. The percentiles determine the distribution!
 
 for s in sections:
@@ -74,22 +74,65 @@ for s in sections:
 
 def corrScoreVec(sortVec, toOrderVec, targetCorr, tolCorr, maxIter):
     """
-    Function to return a new version of usingVec that is shuffled so that its
-    correlation with sortedVec is approximately equal to targetCorrr
+    Function to adjust toOrderVec so its correlation with sortVec 
+    is approximately equal to targetCorr, with a chance of overshooting.
     """
+    assert len(sortVec) == len(toOrderVec)
 
-    masterVec = np.sort(sortVec.copy())
-    usingVec = np.shuffle(toOrderVec.copy())
+    nScores = len(sortVec)
+    masterVec = np.sort(sortVec)  # Sorting ensures consistency
+    usingVec = toOrderVec.copy()
+    np.random.shuffle(usingVec)
 
-    corr = np.corrcoeef(masterVec, usingVec)[0,1]
+    corr = np.corrcoef(masterVec, usingVec)[0, 1]
+    print(f"Initial correlation: {corr}")
+
     iter = 0
-    while abs(corr - targetCorr) >= tolCorr and iter <= maxIter :
-        if corr < targetCorr:
-            
-        else:
+    swaps = 0
+    while abs(corr - targetCorr) >= tolCorr and iter < maxIter:
+        # Dynamic number of swaps based on distance from target correlation
+        numSwaps = max(math.floor(nScores/100), math.ceil(nScores * (abs(corr - targetCorr) / 10)))
 
-        
+        for _ in range(numSwaps):
+            # Randomly select two indices
+            idx1, idx2 = np.random.choice(nScores, 2, replace=False)
 
+            # Ensure idx1 < idx2 for consistent logic
+            if idx1 > idx2:
+                idx1, idx2 = idx2, idx1
 
-        corr = np.corrcoeef(masterVec, usingVec)[0,1]
+            # Get values
+            master1, master2 = masterVec[idx1], masterVec[idx2]
+            use1, use2 = usingVec[idx1], usingVec[idx2]
+
+            if corr < targetCorr:
+                # Normal adjustment: Make swaps to move toward target correlation
+                if (master1 < master2 and use1 > use2) or (master1 > master2 and use1 < use2):
+                    usingVec[idx1], usingVec[idx2] = use2, use1
+            else:
+                # Reverse adjustment: Introduce overshooting
+                if (master1 < master2 and use1 < use2) or (master1 > master2 and use1 > use2):
+                    usingVec[idx1], usingVec[idx2] = use2, use1
+        # Update correlation
+        corr = np.corrcoef(masterVec, usingVec)[0, 1]
         iter += 1
+        swaps += numSwaps
+
+        # Optional: Print progress periodically
+        if iter % 50 == 0:
+            print(f"Iteration {iter}, Swaps {swaps}, correlation: {corr}")
+
+    print(f"Final correlation: {corr} after {iter} iterations and {swaps} swaps")
+    return masterVec, usingVec
+qrVec, vrVec = corrScoreVec(qrSample, vrSample, 0.35, 0.005, 10000)
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.scatter(qrVec, vrVec, marker = "+")
+ax.set_xlim([130, 170])
+ax.set_ylim([130, 170])
+ax.set_xlabel("Quantitative Reasoning")
+ax.set_ylabel("Verbal Reasoning")
+plt.show()
+
+np.corrcoef(qrVec, vrVec)

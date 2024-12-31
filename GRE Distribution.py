@@ -53,7 +53,7 @@ def SampleScores(df, scoreCol, percCol, nScores):
     sampleScores = np.random.choice(scores, size=nScores, p=probabilities)
     return sampleScores
 
-nScores = 100
+nScores = 100000
 awSample = SampleScores(awScoresDf,
                         "Score Levels", "Analytical Writing", nScores=nScores)
 vrSample = SampleScores(vrQrScoresDf,
@@ -118,21 +118,97 @@ def corrScoreVec(sortVec, toOrderVec, targetCorr, tolCorr, maxIter):
         iter += 1
         swaps += numSwaps
 
-        # Optional: Print progress periodically
-        if iter % 50 == 0:
-            print(f"Iteration {iter}, Swaps {swaps}, correlation: {corr}")
-
     print(f"Final correlation: {corr} after {iter} iterations and {swaps} swaps")
     return masterVec, usingVec
-qrVec, vrVec = corrScoreVec(qrSample, vrSample, 0.35, 0.005, 10000)
+qrVec, vrVec = corrScoreVec(qrSample, vrSample, 0.35, 0.005, 10000000)
+
+np.corrcoef(qrVec, vrVec)
+
+def multiCorrScoreVec(orderedVec1,
+                      orderedVec2,
+                      toOrderVec,
+                      targetCorr1,
+                      targetCorr2,
+                      tolCorr,
+                      maxIter):
+    assert len(orderedVec1) == len(orderedVec2) == len(toOrderVec)
+    nScores = len(toOrderVec)
+    corrMat = np.corrcoef([orderedVec1, orderedVec2, toOrderVec])
+    corr1 = corrMat[2,0]
+    corr2 = corrMat[2,1]
+
+    iter = 0
+    while (
+        abs(corr1 - targetCorr1) >= tolCorr or
+        abs(corr2 - targetCorr2) >= tolCorr and
+        iter < maxIter):
+
+        dev1 = abs(corr1 - targetCorr1)
+        dev2 = abs(corr2 - targetCorr2)
+        prob1 = dev1 / (dev1 + dev2) if (dev1 + dev2) > 0 else 0.5
+        prob2 = 1 - prob1
+
+        # Choose which correlation to favor probabilistically
+        favor = np.random.choice([1, 2], p=[prob1, prob2])
+
+        # Generate candidate indices for swapping
+        idx1, idx2 = np.random.choice(nScores, 2, replace=False)
+
+
+        # Ensure idx1 < idx2 for consistent logic
+        if idx1 > idx2:
+            idx1, idx2 = idx2, idx1
+
+        if favor == 1:
+            if (((toOrderVec[idx1] < toOrderVec[idx2]) !=
+                (orderedVec1[idx1] < orderedVec1[idx2]) and
+                corr1 < targetCorr1)
+                or
+                ((toOrderVec[idx1] < toOrderVec[idx2]) ==
+                (orderedVec1[idx1] < orderedVec1[idx2]) and
+                corr1 > targetCorr1)):
+                toOrderVec[idx1], toOrderVec[idx2] = toOrderVec[idx2], toOrderVec[idx1]
+        if favor == 2:
+            if (((toOrderVec[idx1] < toOrderVec[idx2]) !=
+                (orderedVec2[idx1] < orderedVec2[idx2]) and
+                corr1 < targetCorr2)
+                or
+                ((toOrderVec[idx1] < toOrderVec[idx2]) ==
+                (orderedVec2[idx1] < orderedVec2[idx2]) and
+                corr1 > targetCorr2)):
+                toOrderVec[idx1], toOrderVec[idx2] = toOrderVec[idx2], toOrderVec[idx1]
+
+        corrMat = np.corrcoef([orderedVec1, orderedVec2, toOrderVec])
+        corr1 = corrMat[2,0]
+        corr2 = corrMat[2,1]
+        iter += 1
+    return toOrderVec
+
+awVec = multiCorrScoreVec(qrVec, vrVec, awSample, 0.1, 0.63, tolCorr = 0.005, maxIter = 1000000)
+
+scoreSim = [vrVec, qrVec, awVec]
+print(np.corrcoef(scoreSim))
+perfectScores = 0
+for i in range(len(vrVec)):
+    if vrVec[i] == 170 and qrVec[i] == 170 and awVec[i] == 6:
+        perfectScores += 1
+print(f"Of {len(vrVec)} test-takers, {perfectScores} acheived a perfect score.")
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
-ax.scatter(qrVec, vrVec, marker = "+")
+
+scatter = ax.scatter(x=qrVec, y=vrVec, c=awVec, cmap='plasma', marker='o')
+
+# Set axis limits and labels
 ax.set_xlim([130, 170])
 ax.set_ylim([130, 170])
 ax.set_xlabel("Quantitative Reasoning")
 ax.set_ylabel("Verbal Reasoning")
-plt.show()
 
-np.corrcoef(qrVec, vrVec)
+# Add a colorbar to map colors to awVec values
+cbar = plt.colorbar(scatter, ax=ax)
+cbar.set_label("Analytical Writing Score (awVec)")
+
+# Add grid and show plot
+ax.grid(True)
+plt.show()

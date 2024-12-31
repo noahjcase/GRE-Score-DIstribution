@@ -30,12 +30,12 @@ def SampleScores(df, scoreCol, percCol, nScores):
 
     validDf = df.copy()
     validDf[percCol] = validDf[percCol].fillna(0)
-    
+
      # Define the scores and percentiles
 
     scores = validDf[scoreCol].to_numpy()
     percentiles = validDf[percCol].to_numpy()
-    
+
     sorted_indices = np.argsort(-percentiles)  # Negative for descending order
     scores = scores[sorted_indices]
     percentiles = percentiles[sorted_indices]
@@ -74,7 +74,7 @@ for s in sections:
 
 def corrScoreVec(sortVec, toOrderVec, targetCorr, tolCorr, maxIter):
     """
-    Function to adjust toOrderVec so its correlation with sortVec 
+    Function to adjust toOrderVec so its correlation with sortVec
     is approximately equal to targetCorr, with a chance of overshooting.
     """
     assert len(sortVec) == len(toOrderVec)

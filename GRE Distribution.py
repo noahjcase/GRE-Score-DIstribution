@@ -44,16 +44,16 @@ def SampleScores(df, scoreCol, percCol, nScores):
     probabilities = percentiles.copy()
     for i, p in enumerate(percentiles):
         if i == 0:
-            probabilities[i] = (100 - percentiles[i])/100
+            probabilities[i] = (100 - p)/100
             continue
         else:
-            probabilities[i] = (percentiles[i - 1] - percentiles[i])/100
+            probabilities[i] = (percentiles[i - 1] - p)/100
     
     assert np.isclose(np.sum(probabilities), 1)
     sampleScores = np.random.choice(scores, size=nScores, p=probabilities)
     return sampleScores
 
-nScores = 100
+nScores = 1000
 awSample = SampleScores(awScoresDf,
                         "Score Levels", "Analytical Writing", nScores=nScores)
 vrSample = SampleScores(vrQrScoresDf,
@@ -126,13 +126,18 @@ def corrScoreVec(sortVec, toOrderVec, targetCorr, tolCorr, maxIter):
     return masterVec, usingVec
 qrVec, vrVec = corrScoreVec(qrSample, vrSample, 0.35, 0.005, 10000)
 
-fig = plt.figure()
+# Plot QR-VR scatter
+fig = plt.figure(dpi = 300)
 ax = fig.add_subplot(1,1,1)
 ax.scatter(qrVec, vrVec, marker = "+")
 ax.set_xlim([130, 170])
 ax.set_ylim([130, 170])
 ax.set_xlabel("Quantitative Reasoning")
 ax.set_ylabel("Verbal Reasoning")
+ax.set_title("One QR-VR Joint Distribution")
 plt.show()
 
-np.corrcoef(qrVec, vrVec)
+def multiCorrScoreVec(vecCorr1, vecCorr2, toOrderVec, targetCorr):
+    assert len(vecCorr1) == len(vecCorr2) == len(toOrderVec)
+    nScores = len(toOrderVec)
+

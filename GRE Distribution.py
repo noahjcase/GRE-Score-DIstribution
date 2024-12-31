@@ -44,16 +44,20 @@ def SampleScores(df, scoreCol, percCol, nScores):
     probabilities = percentiles.copy()
     for i, p in enumerate(percentiles):
         if i == 0:
-            probabilities[i] = (100 - percentiles[i])/100
+            probabilities[i] = (100 - p)/100
             continue
         else:
-            probabilities[i] = (percentiles[i - 1] - percentiles[i])/100
-
+            probabilities[i] = (percentiles[i - 1] - p)/100
+    
     assert np.isclose(np.sum(probabilities), 1)
     sampleScores = np.random.choice(scores, size=nScores, p=probabilities)
     return sampleScores
 
+<<<<<<< HEAD
 nScores = 100000
+=======
+nScores = 1000
+>>>>>>> 986219eba010c0af684636524761e0ff2346aabf
 awSample = SampleScores(awScoresDf,
                         "Score Levels", "Analytical Writing", nScores=nScores)
 vrSample = SampleScores(vrQrScoresDf,
@@ -194,7 +198,8 @@ for i in range(len(vrVec)):
         perfectScores += 1
 print(f"Of {len(vrVec)} test-takers, {perfectScores} acheived a perfect score.")
 
-fig = plt.figure()
+# Plot QR-VR scatter
+fig = plt.figure(dpi = 300)
 ax = fig.add_subplot(1,1,1)
 
 scatter = ax.scatter(x=qrVec, y=vrVec, c=awVec, cmap='plasma', marker='o')
@@ -204,6 +209,7 @@ ax.set_xlim([130, 170])
 ax.set_ylim([130, 170])
 ax.set_xlabel("Quantitative Reasoning")
 ax.set_ylabel("Verbal Reasoning")
+<<<<<<< HEAD
 
 # Add a colorbar to map colors to awVec values
 cbar = plt.colorbar(scatter, ax=ax)
@@ -212,3 +218,12 @@ cbar.set_label("Analytical Writing Score (awVec)")
 # Add grid and show plot
 ax.grid(True)
 plt.show()
+=======
+ax.set_title("One QR-VR Joint Distribution")
+plt.show()
+
+def multiCorrScoreVec(vecCorr1, vecCorr2, toOrderVec, targetCorr):
+    assert len(vecCorr1) == len(vecCorr2) == len(toOrderVec)
+    nScores = len(toOrderVec)
+
+>>>>>>> 986219eba010c0af684636524761e0ff2346aabf

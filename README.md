@@ -1,7 +1,9 @@
 # Estimating the Joint Distribution of GRE Verbal, Quantitative, and Writing Scores
 
 This repository contains a few different utilities for estimating distributions
-of GRE Scores, and estimating joint percentiles.
+of GRE Scores, and estimating joint percentiles. This is a special case of a
+general question about simulating multivariate data based on knowledge of each
+variable's marginal distribution and the matrix of the variables.
 
 ## Contents of the Repository
 

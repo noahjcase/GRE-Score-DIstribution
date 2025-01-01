@@ -10,134 +10,218 @@ import math
 awScoresDf = pd.read_csv("aw-scores.csv")
 vrQrScoresDf = pd.read_csv("vr-qr-scores.csv")
 
-# function to generate some number of of scores satisfying a given distribution
-def SampleScores(df, scoreCol, percCol, nScores):
+def percentiles_to_probabilities(x_vec, perc_vec):
     """
-    Generate a vector of scores matching a given distribution.
+    Converts a vector of percentile ranks into probabilities corresponding
+    to a given support vector.
 
     Parameters:
-        df (pd.DataFrame): DataFrame containing scores and their percentiles.
-        score_col (str): Column name for the score levels.
-        freq_col (str): Column name for the percentiles.
-        nScores (int): Number of scores to generate.
+        x_vec (array-like): A 1D array of support for the distribution.
+        perc_vec (array-like): A 1D array of percentiles for each value in x_vec.
+            Must be in the interval (0, 1).
 
     Returns:
-        np.ndarray: A vector of scores sampled according to the distribution.
-            implies by the percentiles.
+        tuple: (sorted_x, probabilities)
+            sorted_x (ndarray): Sorted version of x_vec.
+            probabilities (ndarray): Probabilities corresponding to sorted_x.
     """
-    if scoreCol not in df.columns or percCol not in df.columns:
-        raise ValueError(f"Columns '{scoreCol}' and '{percCol}' must exist in the DataFrame '{df}'.")
+    # Ensure inputs are NumPy arrays
+    x_vec = np.asarray(x_vec)
+    perc_vec = np.asarray(perc_vec)
 
-    validDf = df.copy()
-    validDf[percCol] = validDf[percCol].fillna(0)
+    # Input validation
+    if x_vec.shape != perc_vec.shape:
+        raise ValueError("x_vec and perc_vec must have the same shape.")
+    if not ((0 < perc_vec).all() and (perc_vec < 1).all()):
+        raise ValueError("perc_vec must contain values strictly between 0 and 1.")
 
-     # Define the scores and percentiles
+    # Remove data where percentile is 0.
+    perc_vec = np.nan_to_num(perc_vec, nan = 0)
 
-    scores = validDf[scoreCol].to_numpy()
-    percentiles = validDf[percCol].to_numpy()
+    # Sort by percentiles, descending
+    sorted_indices = np.argsort(-perc_vec)
+    sorted_x = x_vec[sorted_indices]
+    sorted_perc = perc_vec[sorted_indices]
 
-    sorted_indices = np.argsort(-percentiles)  # Negative for descending order
-    scores = scores[sorted_indices]
-    percentiles = percentiles[sorted_indices]
-
-    # replace the percentiles with probabilities
-    probabilities = percentiles.copy()
-    for i, p in enumerate(percentiles):
+    probabilities = sorted_perc.copy()
+    for i, p in enumerate(sorted_perc):
         if i == 0:
-            probabilities[i] = (100 - p)/100
+            probabilities[i] = (1 - p)
             continue
         else:
-            probabilities[i] = (percentiles[i - 1] - p)/100
-    
-    assert np.isclose(np.sum(probabilities), 1)
-    sampleScores = np.random.choice(scores, size=nScores, p=probabilities)
-    return sampleScores
+            probabilities[i] = (sorted_perc[i - 1] - p)
 
-nScores = 1000
-awSample = SampleScores(awScoresDf,
-                        "Score Levels", "Analytical Writing", nScores=nScores)
-vrSample = SampleScores(vrQrScoresDf,
-                        "Scaled Score", "Verbal Reasoning", nScores=nScores)
-qrSample = SampleScores(vrQrScoresDf,
-                        "Scaled Score", "Quantitative Reasoning", nScores=nScores)
+    # Ensure probabilities sum to 1
+    if not np.isclose(np.sum(probabilities), 1):
+        raise ValueError("Calculated probabilities do not sum to 1.")
 
-sections = [awSample, vrSample, qrSample]
+    return sorted_x, probabilities
 
-# Quick check that we've gotten the standard deviation and means right.
-# We ought to have. The percentiles determine the distribution!
-
-for s in sections:
-    print(np.mean(s))
-    print(np.std(s))
-
-# Function that takes as an input two vectors and a target correlation
-
-def corrScoreVec(sortVec, toOrderVec, targetCorr, tolCorr, maxIter):
+def corr_score_vec(sort_vec, to_order_vec, target_corr, tol_corr, max_iter):
     """
-    Function to adjust toOrderVec so its correlation with sortVec
-    is approximately equal to targetCorr, with a chance of overshooting.
+    Adjusts `to_order_vec` so its correlation with `sort_vec` 
+    approximates `target_corr` within a given tolerance.
+
+    Parameters:
+        sort_vec (np.ndarray): Reference vector for sorting.
+        to_order_vec (np.ndarray): Vector to adjust.
+        target_corr (float): Target correlation (0 to 1).
+        tol_corr (float): Tolerance for achieving target correlation.
+        max_iter (int): Maximum number of iterations.
+
+    Returns:
+        tuple:
+            np.ndarray: Sorted version of `sort_vec`.
+            np.ndarray: Adjusted version of `to_order_vec` aligned with the sorted `sort_vec`.
     """
-    assert len(sortVec) == len(toOrderVec)
+    # Input validation
+    if not isinstance(sort_vec, np.ndarray) or not isinstance(to_order_vec, np.ndarray):
+        raise ValueError("sort_vec and to_order_vec must be NumPy arrays.")
+    if sort_vec.shape != to_order_vec.shape:
+        raise ValueError("sort_vec and to_order_vec must have the same shape.")
+    if not (0 <= target_corr <= 1):
+        raise ValueError("target_corr must be between 0 and 1.")
+    if tol_corr <= 0:
+        raise ValueError("tol_corr must be a positive number.")
+    if max_iter <= 0:
+        raise ValueError("max_iter must be a positive integer.")
 
-    nScores = len(sortVec)
-    masterVec = np.sort(sortVec)  # Sorting ensures consistency
-    usingVec = toOrderVec.copy()
-    np.random.shuffle(usingVec)
+    # Sort sort_vec to establish the reference ordering
+    n_scores = len(sort_vec)
+    master_vec = np.sort(sort_vec)
+    using_vec = to_order_vec.copy()
+    np.random.shuffle(using_vec)  # Randomize to start with uncorrelated state
 
-    corr = np.corrcoef(masterVec, usingVec)[0, 1]
+    # Initial correlation
+    corr = np.corrcoef(master_vec, using_vec)[0, 1]
     print(f"Initial correlation: {corr}")
 
-    iter = 0
+    iterations = 0
     swaps = 0
-    while abs(corr - targetCorr) >= tolCorr and iter < maxIter:
-        # Dynamic number of swaps based on distance from target correlation
-        numSwaps = max(math.floor(nScores/100), math.ceil(nScores * (abs(corr - targetCorr) / 10)))
 
-        for _ in range(numSwaps):
-            # Randomly select two indices
-            idx1, idx2 = np.random.choice(nScores, 2, replace=False)
+    while abs(corr - target_corr) >= tol_corr and iterations < max_iter:
+        # Determine the number of swaps dynamically
+        num_swaps = max(1, math.ceil(n_scores * (abs(corr - target_corr) / 10)))
 
-            # Ensure idx1 < idx2 for consistent logic
-            if idx1 > idx2:
-                idx1, idx2 = idx2, idx1
-
-            # Get values
-            master1, master2 = masterVec[idx1], masterVec[idx2]
-            use1, use2 = usingVec[idx1], usingVec[idx2]
-
-            if corr < targetCorr:
-                # Normal adjustment: Make swaps to move toward target correlation
-                if (master1 < master2 and use1 > use2) or (master1 > master2 and use1 < use2):
-                    usingVec[idx1], usingVec[idx2] = use2, use1
+        for _ in range(num_swaps):
+            # Randomly select two indices to swap
+            idx1, idx2 = np.random.choice(n_scores, 2, replace=False)
+            if corr < target_corr:
+                # Increase correlation by swapping values that are misaligned with the master vector
+                if (master_vec[idx1] < master_vec[idx2] and using_vec[idx1] > using_vec[idx2]) or \
+                   (master_vec[idx1] > master_vec[idx2] and using_vec[idx1] < using_vec[idx2]):
+                    using_vec[idx1], using_vec[idx2] = using_vec[idx2], using_vec[idx1]
             else:
-                # Reverse adjustment: Introduce overshooting
-                if (master1 < master2 and use1 < use2) or (master1 > master2 and use1 > use2):
-                    usingVec[idx1], usingVec[idx2] = use2, use1
-        # Update correlation
-        corr = np.corrcoef(masterVec, usingVec)[0, 1]
-        iter += 1
-        swaps += numSwaps
+                # Decrease correlation by swapping values that are aligned too closely
+                if (master_vec[idx1] < master_vec[idx2] and using_vec[idx1] < using_vec[idx2]) or \
+                   (master_vec[idx1] > master_vec[idx2] and using_vec[idx1] > using_vec[idx2]):
+                    using_vec[idx1], using_vec[idx2] = using_vec[idx2], using_vec[idx1]
 
-        # Optional: Print progress periodically
-        if iter % 50 == 0:
-            print(f"Iteration {iter}, Swaps {swaps}, correlation: {corr}")
+        # Update correlation and iteration count
+        corr = np.corrcoef(master_vec, using_vec)[0, 1]
+        iterations += 1
+        swaps += num_swaps
 
-    print(f"Final correlation: {corr} after {iter} iterations and {swaps} swaps")
-    return masterVec, usingVec
-qrVec, vrVec = corrScoreVec(qrSample, vrSample, 0.35, 0.005, 10000)
+    print(f"Final correlation: {corr} after {iterations} iterations and {swaps} swaps")
+    return master_vec, using_vec
+
+def multi_corr_vec(ordered_vec1, ordered_vec2, to_order_vec, target_corr1, target_corr2, tol_corr, max_iter):
+    """
+    Adjusts `to_order_vec` so its correlations with `ordered_vec1` and `ordered_vec2`
+    approximate `target_corr1` and `target_corr2` within a given tolerance.
+
+    Parameters:
+        ordered_vec1 (np.ndarray): Reference vector 1 (fixed order).
+        ordered_vec2 (np.ndarray): Reference vector 2 (fixed order).
+        to_order_vec (np.ndarray): Vector to adjust.
+        target_corr1 (float): Target correlation with `ordered_vec1`.
+        target_corr2 (float): Target correlation with `ordered_vec2`.
+        tol_corr (float): Tolerance for achieving target correlations.
+        max_iter (int): Maximum number of iterations.
+
+    Returns:
+        np.ndarray: Adjusted version of `to_order_vec`.
+    """
+    # Input validation
+    if not isinstance(ordered_vec1, np.ndarray) or not isinstance(ordered_vec2, np.ndarray) or not isinstance(to_order_vec, np.ndarray):
+        raise ValueError("All input vectors must be NumPy arrays.")
+    if ordered_vec1.shape != ordered_vec2.shape or ordered_vec1.shape != to_order_vec.shape:
+        raise ValueError("All input vectors must have the same shape.")
+    if not (0 <= target_corr1 <= 1 and 0 <= target_corr2 <= 1):
+        raise ValueError("Target correlations must be between 0 and 1.")
+    if tol_corr <= 0:
+        raise ValueError("tol_corr must be a positive number.")
+    if max_iter <= 0:
+        raise ValueError("max_iter must be a positive integer.")
+
+    # Initialize correlations
+    adjusted_vec = to_order_vec.copy()
+    corr1 = np.corrcoef(ordered_vec1, adjusted_vec)[0, 1]
+    corr2 = np.corrcoef(ordered_vec2, adjusted_vec)[0, 1]
+    print(f"Initial correlations: corr1 = {corr1}, corr2 = {corr2}")
+
+    iterations = 0
+    swaps = 0
+
+    while (abs(corr1 - target_corr1) >= tol_corr or abs(corr2 - target_corr2) >= tol_corr) and iterations < max_iter:
+        # Calculate deviations and probabilities for prioritization
+        dev1 = abs(corr1 - target_corr1)
+        dev2 = abs(corr2 - target_corr2)
+        prob1 = dev1 / (dev1 + dev2) if (dev1 + dev2) > 0 else 0.5
+        prob2 = 1 - prob1
+        favor = np.random.choice([1, 2], p=[prob1, prob2])
+
+        # Determine number of swaps dynamically
+        num_swaps = max(1, int(len(to_order_vec) * 0.1 * max(dev1, dev2)))
+
+        for _ in range(num_swaps):
+            idx1, idx2 = np.random.choice(len(to_order_vec), 2, replace=False)
+
+            if favor == 1:
+                # Adjust correlation with ordered_vec1
+                if ((adjusted_vec[idx1] < adjusted_vec[idx2]) != (ordered_vec1[idx1] < ordered_vec1[idx2]) and corr1 < target_corr1) or \
+                   ((adjusted_vec[idx1] < adjusted_vec[idx2]) == (ordered_vec1[idx1] < ordered_vec1[idx2]) and corr1 > target_corr1):
+                    adjusted_vec[idx1], adjusted_vec[idx2] = adjusted_vec[idx2], adjusted_vec[idx1]
+            elif favor == 2:
+                # Adjust correlation with ordered_vec2
+                if ((adjusted_vec[idx1] < adjusted_vec[idx2]) != (ordered_vec2[idx1] < ordered_vec2[idx2]) and corr2 < target_corr2) or \
+                   ((adjusted_vec[idx1] < adjusted_vec[idx2]) == (ordered_vec2[idx1] < ordered_vec2[idx2]) and corr2 > target_corr2):
+                    adjusted_vec[idx1], adjusted_vec[idx2] = adjusted_vec[idx2], adjusted_vec[idx1]
+
+        # Update correlations
+        corr1 = np.corrcoef(ordered_vec1, adjusted_vec)[0, 1]
+        corr2 = np.corrcoef(ordered_vec2, adjusted_vec)[0, 1]
+        iterations += 1
+        swaps += num_swaps
+
+    print(f"Final correlations: corr1 = {corr1}, corr2 = {corr2} after {iterations} iterations and {swaps} swaps.")
+    return adjusted_vec
+
+awVec = multiCorrScoreVec(qrVec, vrVec, awSample, 0.1, 0.63, tolCorr = 0.001, maxIter = 1000000)
+
+scoreSim = [vrVec, qrVec, awVec]
+print(np.corrcoef(scoreSim))
+perfectScores = 0
+for i in range(len(vrVec)):
+    if vrVec[i] == 170 and qrVec[i] == 170 and awVec[i] == 6:
+        perfectScores += 1
+print(f"Of {len(vrVec)} test-takers, {perfectScores} acheived a perfect score.")
 
 # Plot QR-VR scatter
 fig = plt.figure(dpi = 300)
 ax = fig.add_subplot(1,1,1)
-ax.scatter(qrVec, vrVec, marker = "+")
+
+scatter = ax.scatter(x=qrVec, y=vrVec, c=awVec, cmap='plasma', marker='o')
+
+# Set axis limits and labels
 ax.set_xlim([130, 170])
 ax.set_ylim([130, 170])
 ax.set_xlabel("Quantitative Reasoning")
 ax.set_ylabel("Verbal Reasoning")
-ax.set_title("One QR-VR Joint Distribution")
+# Add a colorbar to map colors to awVec values
+cbar = plt.colorbar(scatter, ax=ax)
+cbar.set_label("Analytical Writing Score (awVec)")
+
+# Add grid and show plot
+ax.grid(True)
 plt.show()
-
-def multiCorrScoreVec(vecCorr1, vecCorr2, toOrderVec, targetCorr):
-    assert len(vecCorr1) == len(vecCorr2) == len(toOrderVec)
-    nScores = len(toOrderVec)
-

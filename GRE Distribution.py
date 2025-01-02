@@ -58,9 +58,9 @@ def percentiles_to_probabilities(x_vec, perc_vec):
 
     return sorted_x, probabilities
 
-def corr_score_vec(sort_vec, to_order_vec, target_corr, tol_corr, max_iter):
+def corr_sim(sort_vec, to_order_vec, target_corr, tol_corr, max_iter):
     """
-    Adjusts `to_order_vec` so its correlation with `sort_vec` 
+    Adjusts `to_order_vec` so its correlation with `sort_vec`
     approximates `target_corr` within a given tolerance.
 
     Parameters:
@@ -126,7 +126,7 @@ def corr_score_vec(sort_vec, to_order_vec, target_corr, tol_corr, max_iter):
     print(f"Final correlation: {corr} after {iterations} iterations and {swaps} swaps")
     return master_vec, using_vec
 
-def multi_corr_vec(ordered_vec1, ordered_vec2, to_order_vec, target_corr1, target_corr2, tol_corr, max_iter):
+def multi_corr_sim(ordered_vec1, ordered_vec2, to_order_vec, target_corr1, target_corr2, tol_corr, max_iter):
     """
     Adjusts `to_order_vec` so its correlations with `ordered_vec1` and `ordered_vec2`
     approximate `target_corr1` and `target_corr2` within a given tolerance.
@@ -199,7 +199,7 @@ def multi_corr_vec(ordered_vec1, ordered_vec2, to_order_vec, target_corr1, targe
     return adjusted_vec
 
 # awVec = multiCorrScoreVec(qrVec, vrVec, awSample, 0.1, 0.63, tolCorr = 0.001, maxIter = 1000000)
-# 
+#
 # scoreSim = [vrVec, qrVec, awVec]
 # print(np.corrcoef(scoreSim))
 # perfectScores = 0
@@ -207,13 +207,13 @@ def multi_corr_vec(ordered_vec1, ordered_vec2, to_order_vec, target_corr1, targe
 #     if vrVec[i] == 170 and qrVec[i] == 170 and awVec[i] == 6:
 #         perfectScores += 1
 # print(f"Of {len(vrVec)} test-takers, {perfectScores} acheived a perfect score.")
-# 
+#
 # # Plot QR-VR scatter
 # fig = plt.figure(dpi = 300)
 # ax = fig.add_subplot(1,1,1)
-# 
+#
 # scatter = ax.scatter(x=qrVec, y=vrVec, c=awVec, cmap='plasma', marker='o')
-# 
+#
 # # Set axis limits and labels
 # ax.set_xlim([130, 170])
 # ax.set_ylim([130, 170])
@@ -222,7 +222,7 @@ def multi_corr_vec(ordered_vec1, ordered_vec2, to_order_vec, target_corr1, targe
 # # Add a colorbar to map colors to awVec values
 # cbar = plt.colorbar(scatter, ax=ax)
 # cbar.set_label("Analytical Writing Score (awVec)")
-# 
+#
 # # Add grid and show plot
 # ax.grid(True)
 # plt.show()

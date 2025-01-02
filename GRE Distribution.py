@@ -28,14 +28,16 @@ def percentiles_to_probabilities(x_vec, perc_vec):
     x_vec = np.asarray(x_vec)
     perc_vec = np.asarray(perc_vec)
 
+
+    #Convert nan to 0
+    perc_vec = np.nan_to_num(perc_vec, nan = 0)
+
     # Input validation
     if x_vec.shape != perc_vec.shape:
         raise ValueError("x_vec and perc_vec must have the same shape.")
-    if not ((0 < perc_vec).all() and (perc_vec < 1).all()):
+    if not ((0 <= perc_vec).all() and (perc_vec < 1).all()):
         raise ValueError("perc_vec must contain values strictly between 0 and 1.")
 
-    # Remove data where percentile is 0.
-    perc_vec = np.nan_to_num(perc_vec, nan = 0)
 
     # Sort by percentiles, descending
     sorted_indices = np.argsort(-perc_vec)

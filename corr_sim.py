@@ -1,9 +1,7 @@
 """Various Utilities for understanding the distribution of GRE Scores"""
 
 # Import required packages
-import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import math
 
 # Read the csv files to pd data frams
@@ -197,33 +195,3 @@ def multi_corr_sim(ordered_vec1, ordered_vec2, to_order_vec, target_corr1, targe
 
     print(f"Final correlations: corr1 = {corr1}, corr2 = {corr2} after {iterations} iterations and {swaps} swaps.")
     return adjusted_vec
-
-# awVec = multiCorrScoreVec(qrVec, vrVec, awSample, 0.1, 0.63, tolCorr = 0.001, maxIter = 1000000)
-#
-# scoreSim = [vrVec, qrVec, awVec]
-# print(np.corrcoef(scoreSim))
-# perfectScores = 0
-# for i in range(len(vrVec)):
-#     if vrVec[i] == 170 and qrVec[i] == 170 and awVec[i] == 6:
-#         perfectScores += 1
-# print(f"Of {len(vrVec)} test-takers, {perfectScores} acheived a perfect score.")
-#
-# # Plot QR-VR scatter
-# fig = plt.figure(dpi = 300)
-# ax = fig.add_subplot(1,1,1)
-#
-# scatter = ax.scatter(x=qrVec, y=vrVec, c=awVec, cmap='plasma', marker='o')
-#
-# # Set axis limits and labels
-# ax.set_xlim([130, 170])
-# ax.set_ylim([130, 170])
-# ax.set_xlabel("Quantitative Reasoning")
-# ax.set_ylabel("Verbal Reasoning")
-# # Add a colorbar to map colors to awVec values
-# cbar = plt.colorbar(scatter, ax=ax)
-# cbar.set_label("Analytical Writing Score (awVec)")
-#
-# # Add grid and show plot
-# ax.grid(True)
-# plt.show()
-# plt.show()

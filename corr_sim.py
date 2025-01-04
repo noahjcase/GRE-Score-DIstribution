@@ -1,4 +1,7 @@
-"""Various Utilities for understanding the distribution of GRE Scores"""
+"""
+Various Uuilities for simulating correlated data based on marginal
+distributions of variables and Pearson correlations between variables.
+"""
 
 # Import required packages
 import numpy as np
